@@ -195,7 +195,7 @@ HTML_TEMPLATE = """
                     <div class="comment">{{ comment }}</div>
                     <div class="sub">Pico 2W Station · Auto refresh 15s</div>
                 </div>
-                <div class="pill"><span class="dot"></span> Last Sync: {{ time }}</div>
+                <div class="pill"><span class="dot"></span> Last Updated: {{ time }}</div>
             </div>
         </div>
 
@@ -235,7 +235,7 @@ HTML_TEMPLATE = """
         </div>
 
         <div class="chart-container">
-            <h2>Environment Trends (last {{ labels|length }} points)</h2>
+            <h2>Environment Trends</h2>
             <canvas id="airChart"></canvas>
         </div>
     </div>
