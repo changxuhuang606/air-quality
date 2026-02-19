@@ -23,12 +23,18 @@ def get_air_quality_info(co2, pm25, voc):
     try:
         c, p, v = float(co2), float(pm25), float(voc)
         if c > 1500 or p > 75 or v > 600:
-            return "⚠️ POOR: Open windows!", "#e74c3c" # Red
+            return "⚠️ POOR: Open windows!", "#e74c3c"  # Red
         if c > 1000 or p > 35 or v > 250:
-            return "OK: Air is getting stale.", "#f1c40f" # Yellow
-        return "Excellent: Air is fresh.", "#2ecc71" # Green
+            return "OK: Air is getting stale.", "#f1c40f"  # Yellow
+        return "Excellent: Air is fresh.", "#2ecc71"  # Green
     except:
         return "Waiting for Pico...", "#7f8c8d"
+
+def safe_float(x, default=0.0):
+    try:
+        return float(x)
+    except:
+        return default
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -39,44 +45,214 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: auto; }
-        .header { background: #1e293b; padding: 20px; border-radius: 15px; margin-bottom: 20px; border-top: 8px solid {{ color }}; }
-        .comment { font-size: 1.6em; font-weight: bold; color: {{ color }}; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; }
-        .card { background: #1e293b; padding: 15px; border-radius: 12px; border: 1px solid #334155; }
-        .card label { font-size: 0.8em; color: #94a3b8; display: block; margin-bottom: 5px; }
-        .card span { font-size: 1.4em; font-weight: bold; color: #38bdf8; }
-        .chart-container { background: #1e293b; padding: 20px; border-radius: 15px; margin-top: 25px; border: 1px solid #334155; }
-        h2 { margin: 0 0 15px 0; font-size: 1.1em; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
+        :root{
+            --bg: #f6f8fc;
+            --panel: #ffffff;
+            --text: #0f172a;
+            --muted: #64748b;
+            --border: #e5e7eb;
+            --shadow: 0 10px 30px rgba(2, 6, 23, .08);
+            --radius: 16px;
+
+            --blue: #2563eb;
+            --violet: #7c3aed;
+            --amber: #f59e0b;
+            --cyan: #06b6d4;
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: radial-gradient(1200px 600px at 10% -10%, rgba(37,99,235,.15), transparent 55%),
+                        radial-gradient(900px 500px at 90% 0%, rgba(124,58,237,.12), transparent 55%),
+                        var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 22px;
+        }
+
+        .container { max-width: 980px; margin: 0 auto; }
+
+        .header {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 18px 16px;
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+        }
+        .header:before{
+            content:"";
+            position:absolute; left:0; top:0; right:0; height:8px;
+            background: linear-gradient(90deg, {{ color }}, rgba(37,99,235,.25));
+        }
+
+        .title-row{
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap: 12px;
+        }
+        .brand{
+            display:flex; flex-direction:column; gap:6px;
+        }
+        .comment {
+            font-size: 1.25em;
+            font-weight: 750;
+            line-height: 1.2;
+            color: var(--text);
+        }
+        .sub {
+            color: var(--muted);
+            font-size: .95em;
+        }
+        .pill {
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: #f8fafc;
+            color: var(--muted);
+            font-size: .9em;
+            white-space: nowrap;
+        }
+        .dot{
+            width:10px; height:10px; border-radius:50%;
+            background: {{ color }};
+            box-shadow: 0 0 0 4px rgba(0,0,0,.04);
+        }
+
+        .grid {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 14px;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px 14px 12px;
+            box-shadow: 0 6px 18px rgba(2, 6, 23, .06);
+        }
+        .card label {
+            font-size: 0.78em;
+            color: var(--muted);
+            display: block;
+            margin-bottom: 7px;
+            letter-spacing: .02em;
+            text-transform: uppercase;
+        }
+        .value-row{
+            display:flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .card span {
+            font-size: 1.55em;
+            font-weight: 800;
+            color: #0b1220;
+        }
+        .unit {
+            color: var(--muted);
+            font-weight: 600;
+            font-size: .95em;
+        }
+
+        .chart-container {
+            margin-top: 16px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 16px 14px;
+            box-shadow: var(--shadow);
+        }
+        h2 {
+            margin: 0 0 10px 0;
+            font-size: 0.95em;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .12em;
+        }
+        canvas { width: 100% !important; height: 360px !important; }
+
+        @media (max-width: 520px){
+            body { padding: 14px; }
+            canvas { height: 300px !important; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div class="comment">{{ comment }}</div>
-            <p>Pico 2W Station | Last Sync: {{ time }}</p>
+            <div class="title-row">
+                <div class="brand">
+                    <div class="comment">{{ comment }}</div>
+                    <div class="sub">Pico 2W Station · Auto refresh 15s</div>
+                </div>
+                <div class="pill"><span class="dot"></span> Last Sync: {{ time }}</div>
+            </div>
         </div>
 
         <div class="grid">
-            <div class="card"><label>Temperature</label><span>{{temp}} °C</span></div>
-            <div class="card"><label>Humidity</label><span>{{hum}} %</span></div>
-            <div class="card"><label>CO2 Level</label><span>{{co2}} ppm</span></div>
-            <div class="card"><label>PM 2.5</label><span>{{pm25}} µg/m³</span></div>
-            <div class="card"><label>VOC Index</label><span>{{voc}} ppb</span></div>
-            <div class="card"><label>Altitude</label><span>{{alt}} m</span></div>
-            <div class="card"><label>Pressure</label><span>{{pres}} hPa</span></div>
-            <div class="card"><label>Gas Raw</label><span>{{gas}}</span></div>
+            <div class="card">
+                <label>Temperature</label>
+                <div class="value-row"><span>{{temp}}</span><div class="unit">°C</div></div>
+            </div>
+            <div class="card">
+                <label>Humidity</label>
+                <div class="value-row"><span>{{hum}}</span><div class="unit">%</div></div>
+            </div>
+            <div class="card">
+                <label>CO2</label>
+                <div class="value-row"><span>{{co2}}</span><div class="unit">ppm</div></div>
+            </div>
+            <div class="card">
+                <label>PM 2.5</label>
+                <div class="value-row"><span>{{pm25}}</span><div class="unit">µg/m³</div></div>
+            </div>
+            <div class="card">
+                <label>VOC</label>
+                <div class="value-row"><span>{{voc}}</span><div class="unit">ppb</div></div>
+            </div>
+            <div class="card">
+                <label>Altitude</label>
+                <div class="value-row"><span>{{alt}}</span><div class="unit">m</div></div>
+            </div>
+            <div class="card">
+                <label>Pressure</label>
+                <div class="value-row"><span>{{pres}}</span><div class="unit">hPa</div></div>
+            </div>
+            <div class="card">
+                <label>Gas Raw</label>
+                <div class="value-row"><span>{{gas}}</span><div class="unit">&nbsp;</div></div>
+            </div>
         </div>
 
         <div class="chart-container">
-            <h2>Environment Trends</h2>
+            <h2>Environment Trends (last {{ labels|length }} points)</h2>
             <canvas id="airChart"></canvas>
         </div>
     </div>
 
     <script>
+        // Improve rendering on high-DPI screens
+        Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
+
         const ctx = document.getElementById('airChart').getContext('2d');
+
+        // Colors in rgba
+        const cBlue   = 'rgba(37, 99, 235, 1)';
+        const cBlueF  = 'rgba(37, 99, 235, .12)';
+        const cViolet = 'rgba(124, 58, 237, 1)';
+        const cVioletF= 'rgba(124, 58, 237, .08)';
+        const cAmber  = 'rgba(245, 158, 11, 1)';
+
         new Chart(ctx, {
             type: 'line',
             data: {
@@ -85,40 +261,88 @@ HTML_TEMPLATE = """
                     {
                         label: 'CO2 (ppm)',
                         data: {{ history_co2|tojson }},
-                        borderColor: '#38bdf8',
-                        backgroundColor: '#38bdf833',
+                        borderColor: cBlue,
+                        backgroundColor: cBlueF,
                         yAxisID: 'y_large',
-                        tension: 0.3,
-                        fill: true
+                        tension: 0.35,
+                        fill: true,
+                        borderWidth: 2.5,
+                        pointRadius: 1.8,
+                        pointHoverRadius: 4,
+                        pointHitRadius: 10
                     },
                     {
                         label: 'VOC (ppb)',
                         data: {{ history_voc|tojson }},
-                        borderColor: '#a855f7',
+                        borderColor: cViolet,
+                        backgroundColor: cVioletF,
                         yAxisID: 'y_large',
-                        tension: 0.3
+                        tension: 0.35,
+                        fill: false,
+                        borderWidth: 2.2,
+                        pointRadius: 1.8,
+                        pointHoverRadius: 4,
+                        pointHitRadius: 10
                     },
                     {
                         label: 'Temp (°C)',
                         data: {{ history_temp|tojson }},
-                        borderColor: '#fbbf24',
+                        borderColor: cAmber,
                         yAxisID: 'y_small',
-                        tension: 0.3
+                        tension: 0.35,
+                        fill: false,
+                        borderWidth: 2.2,
+                        pointRadius: 1.8,
+                        pointHoverRadius: 4,
+                        pointHitRadius: 10
                     }
                 ]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            boxWidth: 10,
+                            boxHeight: 10,
+                            color: '#0f172a',
+                            font: { size: 12, weight: '600' }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, .92)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        padding: 10,
+                        displayColors: true
+                    }
+                },
                 scales: {
+                    x: {
+                        grid: { color: 'rgba(15, 23, 42, .06)' },
+                        ticks: { color: '#64748b', maxRotation: 0, autoSkip: true }
+                    },
                     y_large: {
-                        type: 'linear', position: 'left',
-                        grid: { color: '#334155' },
-                        title: { display: true, text: 'Gases' }
+                        type: 'linear',
+                        position: 'left',
+                        grid: { color: 'rgba(15, 23, 42, .06)' },
+                        ticks: { color: '#64748b' },
+                        title: { display: true, text: 'CO2 / VOC', color: '#64748b', font: { weight: '600' } },
+                        suggestedMin: 0,
+                        suggestedMax: 2000
                     },
                     y_small: {
-                        type: 'linear', position: 'right',
+                        type: 'linear',
+                        position: 'right',
                         grid: { drawOnChartArea: false },
-                        title: { display: true, text: 'Temp' }
+                        ticks: { color: '#64748b' },
+                        title: { display: true, text: 'Temperature', color: '#64748b', font: { weight: '600' } },
+                        suggestedMin: 0,
+                        suggestedMax: 60
                     }
                 }
             }
@@ -132,9 +356,9 @@ HTML_TEMPLATE = """
 def home():
     msg, col = get_air_quality_info(latest_data['co2'], latest_data['pm25'], latest_data['voc'])
     return render_template_string(
-        HTML_TEMPLATE, 
-        **latest_data, 
-        comment=msg, 
+        HTML_TEMPLATE,
+        **latest_data,
+        comment=msg,
         color=col,
         time=time.strftime("%H:%M:%S"),
         labels=list(history["labels"]),
@@ -148,19 +372,21 @@ def update():
     # Capture parameters from Pico
     for key in ['hum', 'pres', 'alt', 'co2', 'voc', 'pm25', 'gas']:
         val = request.args.get(key)
-        if val: latest_data[key] = val
-    
+        if val is not None and val != "":
+            latest_data[key] = val
+
     # Handle temperature separately because Pico sends it as 't'
     temp_val = request.args.get('t')
-    if temp_val: latest_data['temp'] = temp_val
+    if temp_val is not None and temp_val != "":
+        latest_data['temp'] = temp_val
 
-    # Update history for charts
+    # Update history for charts (robust to bad/empty values)
     current_time = time.strftime("%H:%M")
     history["labels"].append(current_time)
-    history["temp"].append(float(latest_data["temp"]))
-    history["co2"].append(float(latest_data["co2"]))
-    history["voc"].append(float(latest_data["voc"]))
-    
+    history["temp"].append(safe_float(latest_data["temp"]))
+    history["co2"].append(safe_float(latest_data["co2"]))
+    history["voc"].append(safe_float(latest_data["voc"]))
+
     return "Data Received", 200
 
 if __name__ == '__main__':
